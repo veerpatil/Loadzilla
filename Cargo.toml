@@ -1,0 +1,22 @@
+[package]
+name = "perftest"
+version = "0.1.0"
+edition = "2021"
+description = "A fast HTTP load-testing CLI for performance testing"
+license = "MIT"
+readme = "README.md"
+keywords = ["benchmark", "load-test", "performance", "http", "cli"]
+categories = ["command-line-utilities", "development-tools::profiling"]
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+hdrhistogram = "7"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tokio = { version = "1", features = ["full"] }
+url = "2"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
