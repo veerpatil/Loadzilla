@@ -44,6 +44,12 @@ perftest https://example.com -d 10s -c 20 -r 100
 
 # Machine-readable output
 perftest https://example.com -n 500 -c 25 --json
+
+# Save a self-contained HTML report
+perftest https://example.com -n 500 -c 25 --html-report report.html
+
+# Publish the report through GitHub Pages
+perftest https://example.com -n 500 -c 25 --html-report docs/reports/latest.html
 ```
 
 ### Flags
@@ -61,6 +67,7 @@ perftest https://example.com -n 500 -c 25 --json
 | `--body-file` | Request body from file | — |
 | `--fail-on-status` | Treat non-2xx as errors | `true` |
 | `--json` | Print JSON summary | off |
+| `--html-report` | Write a self-contained HTML report | — |
 | `--no-keepalive` | Disable connection reuse | off |
 
 ## What it reports
@@ -70,6 +77,7 @@ perftest https://example.com -n 500 -c 25 --json
 - Bytes transferred
 - Latency: min, avg, p50, p90, p95, p99, max
 - Status code histogram
+- Optional self-contained HTML report
 
 ## Example output
 
@@ -104,7 +112,7 @@ Status codes
 src/
   main.rs     CLI parsing and entrypoint
   runner.rs   Async load generator
-  report.rs   Human + JSON reporters
+  report.rs   Human + JSON + HTML reporters
 ```
 
 ## License

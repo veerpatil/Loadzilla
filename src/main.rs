@@ -63,6 +63,10 @@ struct Cli {
     #[arg(long)]
     json: bool,
 
+    /// Write a self-contained HTML report to this path
+    #[arg(long = "html-report", value_name = "PATH")]
+    html_report: Option<PathBuf>,
+
     /// Disable keep-alive / connection reuse
     #[arg(long)]
     no_keepalive: bool,
@@ -219,6 +223,12 @@ async fn main() -> Result<()> {
         report::print_json(&summary)?;
     } else {
         report::print_human(&summary);
+    }
+
+    if let Some(path) = &cli.html_report {
+        report::write_html(&summary, path)
+            .with_context(|| format!("failed to write HTML report {}", path.display()))?;
+        eprintln!("HTML report written to {}", path.display());
     }
 
     if summary.error_count > 0 && summary.ok_count == 0 {

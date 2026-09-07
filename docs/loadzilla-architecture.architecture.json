@@ -1,0 +1,276 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "perftest Runtime Architecture",
+    "output": "loadzilla-architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/veerpatil/Loadzilla",
+      "revision": "9dcf76e1db94e3429e016456a1c3e5c2f10f6ed2"
+    },
+    "viewBox": [1160, 520],
+    "views": [
+      {
+        "id": "primary-run",
+        "label": "Primary run path",
+        "focus": ["operator", "cli", "config", "runner", "client", "target", "samples", "summary", "reporter"],
+        "note": "Follow a normal load-test run from flags to outbound HTTP traffic and final output."
+      },
+      {
+        "id": "load-control",
+        "label": "Load control",
+        "focus": ["config", "runner", "rate", "client", "samples"],
+        "note": "Concurrency, duration/request limits, rate gates, and sample fan-in live inside the trusted process."
+      },
+      {
+        "id": "external-boundary",
+        "label": "External boundary",
+        "focus": ["bodyfile", "operator", "client", "target"],
+        "note": "Files, terminal users, CI consumers, and the target service sit outside the perftest process."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "operator",
+      "type": "external",
+      "label": "Developer / CI",
+      "sublabel": "terminal argv, stdout, exit",
+      "pos": [40, 245],
+      "size": [150, 66],
+      "sources": [{ "path": "README.md", "line": 20, "label": "Usage examples" }]
+    },
+    {
+      "id": "bodyfile",
+      "type": "external",
+      "label": "Body File",
+      "sublabel": "--body-file input",
+      "pos": [245, 85],
+      "size": [136, 58],
+      "tag": "optional",
+      "sources": [{ "path": "src/main.rs", "line": 145, "label": "async file read" }]
+    },
+    {
+      "id": "cli",
+      "type": "frontend",
+      "label": "CLI Parser",
+      "sublabel": "clap flags + validation",
+      "pos": [250, 245],
+      "size": [142, 66],
+      "sources": [{ "path": "src/main.rs", "line": 9, "label": "Cli struct" }]
+    },
+    {
+      "id": "config",
+      "type": "backend",
+      "label": "Run Config",
+      "sublabel": "method, URL, limits, body",
+      "pos": [460, 245],
+      "size": [150, 66],
+      "sources": [{ "path": "src/runner.rs", "line": 11, "label": "Config" }]
+    },
+    {
+      "id": "runner",
+      "type": "backend",
+      "label": "Async Runner",
+      "sublabel": "Tokio worker pool",
+      "pos": [680, 245],
+      "size": [150, 66],
+      "sources": [{ "path": "src/runner.rs", "line": 43, "label": "run(config)" }]
+    },
+    {
+      "id": "rate",
+      "type": "messagebus",
+      "label": "Rate Gate",
+      "sublabel": "interval + mpsc permits",
+      "pos": [680, 80],
+      "size": [150, 60],
+      "tag": "optional -r",
+      "sources": [{ "path": "src/runner.rs", "line": 72, "label": "rate limit" }]
+    },
+    {
+      "id": "client",
+      "type": "cloud",
+      "label": "reqwest Client",
+      "sublabel": "rustls, timeout, keep-alive",
+      "pos": [895, 245],
+      "size": [156, 66],
+      "sources": [{ "path": "src/runner.rs", "line": 44, "label": "client builder" }]
+    },
+    {
+      "id": "target",
+      "type": "external",
+      "label": "Target HTTP(S) Service",
+      "sublabel": "system under test",
+      "pos": [965, 65],
+      "size": [158, 66],
+      "sources": [{ "path": "REQUIREMENTS.md", "line": 11, "label": "R1" }]
+    },
+    {
+      "id": "samples",
+      "type": "messagebus",
+      "label": "Sample Channel",
+      "sublabel": "latency, status, ok/error",
+      "pos": [898, 340],
+      "size": [150, 60],
+      "sources": [{ "path": "src/runner.rs", "line": 90, "label": "mpsc samples" }]
+    },
+    {
+      "id": "summary",
+      "type": "database",
+      "label": "Summary Builder",
+      "sublabel": "histogram + counters",
+      "pos": [670, 425],
+      "size": [164, 62],
+      "sources": [{ "path": "src/runner.rs", "line": 230, "label": "build_summary" }]
+    },
+    {
+      "id": "reporter",
+      "type": "backend",
+      "label": "Reporter",
+      "sublabel": "human table or JSON",
+      "pos": [455, 425],
+      "size": [150, 62],
+      "sources": [{ "path": "src/report.rs", "line": 4, "label": "output modes" }]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Trusted perftest process",
+      "wraps": ["cli", "config", "runner", "rate", "client", "samples", "summary", "reporter"],
+      "pad": 28
+    },
+    {
+      "kind": "security-group",
+      "label": "Untrusted environment and network",
+      "wraps": ["operator", "bodyfile", "target"],
+      "pad": 18
+    }
+  ],
+  "connections": [
+    {
+      "id": "invoke-cli",
+      "from": "operator",
+      "to": "cli",
+      "label": "argv",
+      "variant": "emphasis"
+    },
+    {
+      "id": "body-to-cli",
+      "from": "bodyfile",
+      "to": "cli",
+      "label": "read bytes",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 18
+    },
+    {
+      "id": "cli-to-config",
+      "from": "cli",
+      "to": "config",
+      "label": "validated settings",
+      "variant": "emphasis",
+      "labelDy": 57
+    },
+    {
+      "id": "config-to-runner",
+      "from": "config",
+      "to": "runner",
+      "label": "run(config)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "rate-to-runner",
+      "from": "rate",
+      "to": "runner",
+      "label": "permits",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 42
+    },
+    {
+      "id": "runner-to-client",
+      "from": "runner",
+      "to": "client",
+      "label": "worker requests",
+      "variant": "emphasis",
+      "labelDy": 57
+    },
+    {
+      "id": "client-to-target",
+      "from": "client",
+      "to": "target",
+      "label": "HTTP(S)",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelDy": -20
+    },
+    {
+      "id": "client-to-samples",
+      "from": "client",
+      "to": "samples",
+      "label": "Sample",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelDy": 20
+    },
+    {
+      "id": "samples-to-summary",
+      "from": "samples",
+      "to": "summary",
+      "label": "aggregate",
+      "variant": "emphasis"
+    },
+    {
+      "id": "summary-to-reporter",
+      "from": "summary",
+      "to": "reporter",
+      "label": "Summary",
+      "variant": "emphasis"
+    },
+    {
+      "id": "reporter-to-operator",
+      "from": "reporter",
+      "to": "operator",
+      "label": "stdout / exit",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Primary Path",
+      "items": [
+        "Flags and optional body input become validated config.",
+        "Tokio workers send HTTP(S) traffic through reqwest.",
+        "Samples fan in before final reporting."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Controls and Metrics",
+      "items": [
+        "Concurrency maps to spawned worker tasks.",
+        "Runs stop by request count or duration-set atomic flag.",
+        "Rate limiting uses interval permits.",
+        "hdrhistogram provides percentiles.",
+        "Status counts use a sorted BTreeMap."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Trust Boundaries",
+      "items": [
+        "CLI input, body files, scripts, and target service are outside the process.",
+        "URL scheme validation allows http or https.",
+        "rustls avoids an OpenSSL runtime dependency."
+      ]
+    }
+  ]
+}
