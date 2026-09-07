@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>perftest report</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fb;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #5f6d83;
+      --line: #dbe2ee;
+      --accent: #0f9f8f;
+      --danger: #c2410c;
+      --blue: #2563eb;
+      --amber: #d97706;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main {
+      width: min(1120px, calc(100vw - 32px));
+      margin: 32px auto;
+    }
+    header {
+      margin-bottom: 22px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      letter-spacing: 0;
+    }
+    .target {
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    .metric, section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 1px 2px rgba(23, 32, 51, 0.04);
+    }
+    .metric {
+      padding: 16px;
+    }
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .metric strong {
+      display: block;
+      margin-top: 6px;
+      font-size: 24px;
+    }
+    section {
+      padding: 18px;
+      margin-top: 18px;
+    }
+    h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+    }
+    th {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    tr:last-child td { border-bottom: 0; }
+    .ok { color: var(--accent); }
+    .err { color: var(--danger); }
+    .charts {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+      gap: 18px;
+      margin-top: 18px;
+    }
+    .chart {
+      background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: 0 1px 2px rgba(23, 32, 51, 0.04);
+    }
+    .chart h2 {
+      margin-bottom: 16px;
+    }
+    .bar-row {
+      display: grid;
+      grid-template-columns: 52px minmax(90px, 1fr) 84px;
+      align-items: center;
+      gap: 12px;
+      margin: 10px 0;
+    }
+    .bar-label, .bar-value {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .bar-value {
+      text-align: right;
+    }
+    .bar-track {
+      height: 12px;
+      overflow: hidden;
+      background: #e9eef7;
+      border-radius: 999px;
+    }
+    .bar-fill {
+      display: block;
+      height: 100%;
+      min-width: 2px;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), var(--blue));
+    }
+    .status .bar-fill {
+      background: linear-gradient(90deg, var(--amber), var(--danger));
+    }
+    .donut-wrap {
+      display: grid;
+      grid-template-columns: 132px minmax(0, 1fr);
+      gap: 18px;
+      align-items: center;
+    }
+    .donut {
+      width: 132px;
+      height: 132px;
+      border-radius: 50%;
+      background: conic-gradient(var(--accent) 0 100.000%, var(--danger) 100.000% 100%);
+      position: relative;
+    }
+    .donut::after {
+      content: "";
+      position: absolute;
+      inset: 18px;
+      background: var(--panel);
+      border-radius: 50%;
+      border: 1px solid var(--line);
+    }
+    .legend-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--line);
+      font-variant-numeric: tabular-nums;
+    }
+    .legend-row:last-child {
+      border-bottom: 0;
+    }
+    .swatch {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    .swatch.ok-bg { background: var(--accent); }
+    .swatch.err-bg { background: var(--danger); }
+    @media (max-width: 820px) {
+      .charts {
+        grid-template-columns: 1fr;
+      }
+      .donut-wrap {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>perftest report</h1>
+      <div class="target">GET http://127.0.0.1:8765/README.md</div>
+    </header>
+
+    <div class="grid">
+      <div class="metric"><span>Total requests</span><strong>20</strong></div>
+      <div class="metric"><span>Throughput</span><strong>1485.95 req/s</strong></div>
+      <div class="metric"><span>Duration</span><strong>0.013s</strong></div>
+      <div class="metric"><span>Transfer</span><strong>55.53 KB</strong></div>
+      <div class="metric"><span>Success</span><strong class="ok">100.00%</strong></div>
+      <div class="metric"><span>Errors</span><strong class="err">0.00%</strong></div>
+    </div>
+
+    <div class="charts">
+      <section class="chart">
+        <h2>Latency Profile</h2>
+        <div class="bar-row"><div class="bar-label">min</div><div class="bar-track"><span class="bar-fill" style="width: 10.567%"></span></div><div class="bar-value">0.833</div></div>
+<div class="bar-row"><div class="bar-label">avg</div><div class="bar-track"><span class="bar-fill" style="width: 32.405%"></span></div><div class="bar-value">2.555</div></div>
+<div class="bar-row"><div class="bar-label">p50</div><div class="bar-track"><span class="bar-fill" style="width: 17.354%"></span></div><div class="bar-value">1.368</div></div>
+<div class="bar-row"><div class="bar-label">p90</div><div class="bar-track"><span class="bar-fill" style="width: 98.833%"></span></div><div class="bar-value">7.791</div></div>
+<div class="bar-row"><div class="bar-label">p95</div><div class="bar-track"><span class="bar-fill" style="width: 99.746%"></span></div><div class="bar-value">7.863</div></div>
+<div class="bar-row"><div class="bar-label">p99</div><div class="bar-track"><span class="bar-fill" style="width: 100.000%"></span></div><div class="bar-value">7.883</div></div>
+<div class="bar-row"><div class="bar-label">max</div><div class="bar-track"><span class="bar-fill" style="width: 100.000%"></span></div><div class="bar-value">7.883</div></div>
+      </section>
+
+      <section class="chart">
+        <h2>Request Outcomes</h2>
+        <div class="donut-wrap">
+          <div class="donut" role="img" aria-label="Success 100.00 percent, errors 0.00 percent"></div>
+          <div>
+  <div class="legend-row"><span><span class="swatch ok-bg"></span>OK</span><strong>20</strong></div>
+  <div class="legend-row"><span><span class="swatch err-bg"></span>Errors</span><strong>0</strong></div>
+</div>
+        </div>
+      </section>
+    </div>
+
+    <section class="chart status">
+      <h2>Status Distribution</h2>
+      <div class="bar-row"><div class="bar-label">200</div><div class="bar-track"><span class="bar-fill" style="width: 100.000%"></span></div><div class="bar-value">20</div></div>
+    </section>
+
+    <section>
+      <h2>Run Summary</h2>
+      <table>
+        <tr><th>Field</th><th>Value</th></tr>
+        <tr><td>URL</td><td>http://127.0.0.1:8765/README.md</td></tr>
+        <tr><td>Method</td><td>GET</td></tr>
+        <tr><td>Concurrency</td><td>4</td></tr>
+        <tr><td>OK requests</td><td>20</td></tr>
+        <tr><td>Error requests</td><td>0</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>Latency</h2>
+      <table>
+        <tr><th>Percentile</th><th>Milliseconds</th></tr>
+        <tr><td>min</td><td>0.833</td></tr>
+        <tr><td>avg</td><td>2.555</td></tr>
+        <tr><td>p50</td><td>1.368</td></tr>
+        <tr><td>p90</td><td>7.791</td></tr>
+        <tr><td>p95</td><td>7.863</td></tr>
+        <tr><td>p99</td><td>7.883</td></tr>
+        <tr><td>max</td><td>7.883</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>Status Codes</h2>
+      <table>
+        <tr><th>Status</th><th>Count</th></tr>
+        <tr><td>200</td><td>20</td></tr>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

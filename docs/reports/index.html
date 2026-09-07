@@ -54,6 +54,27 @@
       a {
         color: var(--accent);
       }
+      .links {
+        display: grid;
+        gap: 10px;
+        margin: 18px 0;
+      }
+      .report-link {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--ink);
+        text-decoration: none;
+      }
+      .report-link:hover {
+        border-color: var(--accent);
+      }
+      .report-link span {
+        color: var(--muted);
+      }
     </style>
   </head>
   <body>
@@ -64,6 +85,16 @@
           Save generated load-test reports in this folder to publish them with
           GitHub Pages.
         </p>
+        <div class="links">
+          <a class="report-link" href="./sample.html">
+            Sample report
+            <span>20 local requests</span>
+          </a>
+          <a class="report-link" href="./latest.html">
+            Latest report
+            <span>created by your next run</span>
+          </a>
+        </div>
         <code>perftest https://example.com -n 500 -c 25 --html-report docs/reports/latest.html</code>
         <p style="margin-top: 16px;">
           After committing and pushing the generated report, open
