@@ -1,6 +1,9 @@
+use crate::scenario::{Scenario, Step};
 use anyhow::{Context, Result};
 use hdrhistogram::Histogram;
-use reqwest::{Client, Method};
+use rand::rngs::SmallRng;
+use rand::SeedableRng;
+use reqwest::Client;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -9,15 +12,12 @@ use tokio::time::{interval, MissedTickBehavior};
 
 #[derive(Debug, Clone)]
 pub struct Config {
-    pub url: String,
-    pub method: Method,
+    pub scenario: Arc<Scenario>,
     pub concurrency: usize,
     pub requests: Option<u64>,
     pub duration: Option<Duration>,
     pub timeout: Duration,
     pub rate: u64,
-    pub headers: Vec<(String, String)>,
-    pub body: Option<Vec<u8>>,
     pub fail_on_status: bool,
     pub keepalive: bool,
 }
@@ -106,10 +106,7 @@ pub async fn run(config: Config) -> Result<Summary> {
 
     for _ in 0..config.concurrency {
         let client = client.clone();
-        let url = config.url.clone();
-        let method = config.method.clone();
-        let headers = config.headers.clone();
-        let body = config.body.clone();
+        let scenario = Arc::clone(&config.scenario);
         let fail_on_status = config.fail_on_status;
         let stop = Arc::clone(&stop);
         let issued = Arc::clone(&issued);
@@ -118,6 +115,7 @@ pub async fn run(config: Config) -> Result<Summary> {
         let rate_gate = rate_gate.clone();
 
         joins.push(tokio::spawn(async move {
+            let mut rng = SmallRng::from_entropy();
             loop {
                 if stop.load(Ordering::Relaxed) {
                     break;
@@ -141,16 +139,8 @@ pub async fn run(config: Config) -> Result<Summary> {
                     }
                 }
 
-                let sample = one_request(
-                    &client,
-                    &url,
-                    &method,
-                    &headers,
-                    body.as_deref(),
-                    fail_on_status,
-                    &bytes_counter,
-                )
-                .await;
+                let step = scenario.pick(&mut rng);
+                let sample = one_request(&client, step, fail_on_status, &bytes_counter).await;
 
                 if tx.send(sample).await.is_err() {
                     break;
@@ -181,20 +171,20 @@ pub async fn run(config: Config) -> Result<Summary> {
 
 async fn one_request(
     client: &Client,
-    url: &str,
-    method: &Method,
-    headers: &[(String, String)],
-    body: Option<&[u8]>,
+    step: &Step,
     fail_on_status: bool,
     bytes_counter: &AtomicU64,
 ) -> Sample {
     let started = Instant::now();
-    let mut req = client.request(method.clone(), url);
-    for (name, value) in headers {
+    let mut req = client.request(step.method.clone(), &step.url);
+    for (name, value) in &step.headers {
         req = req.header(name.as_str(), value.as_str());
     }
-    if let Some(b) = body {
-        req = req.body(b.to_vec());
+    if let Some(b) = &step.body {
+        req = req.body(b.clone());
+    }
+    if let Some(t) = step.timeout {
+        req = req.timeout(t);
     }
 
     match req.send().await {
@@ -280,9 +270,14 @@ fn build_summary(
         }
     };
 
+    let (url, method) = match config.scenario.steps.as_slice() {
+        [only] => (only.url.clone(), only.method.to_string()),
+        _ => (config.scenario.name.clone(), "MIXED".to_string()),
+    };
+
     Summary {
-        url: config.url.clone(),
-        method: config.method.to_string(),
+        url,
+        method,
         concurrency: config.concurrency,
         wall_time,
         ok_count,

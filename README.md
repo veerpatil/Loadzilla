@@ -45,6 +45,9 @@ perftest https://example.com -d 10s -c 20 -r 100
 # Machine-readable output
 perftest https://example.com -n 500 -c 25 --json
 
+# Drive multiple weighted endpoints from a scenario file
+perftest --scenario flow.toml -n 1000 -c 50
+
 # Save a self-contained HTML report
 perftest https://example.com -n 500 -c 25 --html-report report.html
 
@@ -56,6 +59,7 @@ perftest https://example.com -n 500 -c 25 --html-report docs/reports/latest.html
 
 | Flag | Description | Default |
 |------|-------------|---------|
+| `--scenario` | Load a multi-request scenario file (TOML); replaces the URL | — |
 | `-X, --method` | HTTP method | `GET` |
 | `-c, --concurrency` | Concurrent workers | `10` |
 | `-n, --requests` | Total requests | `100` (if no `-d`) |
@@ -69,6 +73,42 @@ perftest https://example.com -n 500 -c 25 --html-report docs/reports/latest.html
 | `--json` | Print JSON summary | off |
 | `--html-report` | Write a self-contained HTML report | — |
 | `--no-keepalive` | Disable connection reuse | off |
+
+## Scenario files
+
+Pass `--scenario <file.toml>` to load-test several endpoints in one run. Each
+`[[request]]` is picked in proportion to its `weight` (default `1`), so you can
+model a realistic traffic mix. `--scenario` replaces the positional URL and
+cannot be combined with `-X/--method`, `-b/--body`, or `--body-file`; all other
+flags (`-c`, `-n`, `-d`, `-r`, `-t`, `--json`, `--html-report`, …) still apply.
+
+```toml
+name = "checkout-flow"
+
+# Applied to every request unless overridden
+[defaults]
+headers = { "Accept" = "application/json" }
+timeout = "5s"
+
+[[request]]
+name   = "list-products"
+url    = "https://shop.test/api/products"
+weight = 3
+
+[[request]]
+name   = "add-to-cart"
+method = "POST"
+url    = "https://shop.test/api/cart"
+weight = 1
+headers = { "Content-Type" = "application/json" }
+body   = '{"sku":"42","qty":1}'
+# body_file = "payloads/cart.json"   # alternative to inline body
+```
+
+Any `-H` headers passed on the command line are merged in as defaults (above
+file `[defaults]`, below per-request `headers`), which is handy for injecting a
+global `Authorization` without editing the file. Per-request results are
+aggregated into the same summary today; a per-endpoint breakdown is planned.
 
 ## What it reports
 

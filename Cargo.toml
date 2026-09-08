@@ -10,10 +10,14 @@ categories = ["command-line-utilities", "development-tools::profiling"]
 
 [dependencies]
 anyhow = "1"
+bytes = "1"
 clap = { version = "4", features = ["derive"] }
 hdrhistogram = "7"
+rand = { version = "0.8", features = ["small_rng"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
+toml = "0.8"
 url = "2"
 
 [profile.release]
