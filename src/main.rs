@@ -1,11 +1,13 @@
 use anyhow::{bail, Context, Result};
 use clap::Parser;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
 
 mod report;
 mod runner;
+mod scenario;
 
 /// HTTP load-testing CLI for performance testing.
 #[derive(Debug, Parser)]
@@ -16,8 +18,13 @@ mod runner;
     long_about = None
 )]
 struct Cli {
-    /// Target URL to load-test
-    url: String,
+    /// Target URL to load-test (omit when using --scenario)
+    #[arg(required_unless_present = "scenario", conflicts_with = "scenario")]
+    url: Option<String>,
+
+    /// Load a multi-request scenario file (TOML) instead of a single URL
+    #[arg(long, value_name = "PATH", conflicts_with_all = ["method", "body", "body_file"])]
+    scenario: Option<PathBuf>,
 
     /// HTTP method
     #[arg(short = 'X', long, default_value = "GET", value_parser = parse_method)]
@@ -112,7 +119,7 @@ fn parse_method(s: &str) -> Result<Method, String> {
     }
 }
 
-fn parse_duration(s: &str) -> Result<Duration, String> {
+pub(crate) fn parse_duration(s: &str) -> Result<Duration, String> {
     let s = s.trim();
     if s.is_empty() {
         return Err("duration cannot be empty".into());
@@ -159,20 +166,12 @@ fn parse_header(raw: &str) -> Result<(String, String)> {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let url = Url::parse(&cli.url).context("invalid target URL")?;
-    if !matches!(url.scheme(), "http" | "https") {
-        bail!("URL scheme must be http or https");
-    }
-
     if cli.concurrency == 0 {
         bail!("--concurrency must be at least 1");
     }
 
     let requests = cli.requests;
     let duration = cli.duration;
-    if requests.is_none() && duration.is_none() {
-        // Sensible default: 100 requests when neither is given
-    }
     let requests = requests.or(if duration.is_none() { Some(100) } else { None });
 
     let mut headers = Vec::with_capacity(cli.headers.len());
@@ -180,34 +179,53 @@ async fn main() -> Result<()> {
         headers.push(parse_header(h)?);
     }
 
-    let body = if let Some(path) = &cli.body_file {
-        Some(
-            tokio::fs::read(path)
-                .await
-                .with_context(|| format!("failed to read body file {}", path.display()))?,
-        )
+    let scenario = if let Some(path) = &cli.scenario {
+        // Multi-request scenario; CLI headers layer in as defaults.
+        Arc::new(scenario::Scenario::from_file(path, &headers)?)
     } else {
-        cli.body.map(|s| s.into_bytes())
+        // Classic single-URL path.
+        let raw = cli.url.as_deref().expect("url required unless --scenario");
+        let url = Url::parse(raw).context("invalid target URL")?;
+        if !matches!(url.scheme(), "http" | "https") {
+            bail!("URL scheme must be http or https");
+        }
+
+        let body = if let Some(path) = &cli.body_file {
+            Some(
+                tokio::fs::read(path)
+                    .await
+                    .with_context(|| format!("failed to read body file {}", path.display()))?,
+            )
+        } else {
+            cli.body.map(|s| s.into_bytes())
+        };
+
+        Arc::new(scenario::Scenario::single(
+            url.to_string(),
+            cli.method.as_reqwest(),
+            headers,
+            body,
+        ))
     };
 
     let config = runner::Config {
-        url: url.to_string(),
-        method: cli.method.as_reqwest(),
+        scenario: Arc::clone(&scenario),
         concurrency: cli.concurrency,
         requests,
         duration,
         timeout: cli.timeout,
         rate: cli.rate,
-        headers,
-        body,
         fail_on_status: cli.fail_on_status,
         keepalive: !cli.no_keepalive,
     };
 
+    let target = match scenario.steps.as_slice() {
+        [only] => format!("{} {}", only.method, only.url),
+        steps => format!("scenario '{}' ({} requests)", scenario.name, steps.len()),
+    };
     eprintln!(
-        "perftest → {} {}  concurrency={}  {}",
-        config.method,
-        config.url,
+        "perftest → {}  concurrency={}  {}",
+        target,
         config.concurrency,
         match (config.requests, config.duration) {
             (Some(n), None) => format!("requests={n}"),
